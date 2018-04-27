@@ -1,16 +1,55 @@
 # -*- coding: utf-8 -*-
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
+from jsonschema import validate
+from twitter_api import TwitterApi
+from weather import Weather
+import env
 import json
+import requests
+
+
 app = Flask(__name__)
 
 @app.route('/')
-def hello():
-    return jsonify({'message': 'Welcome to our api'})
+def dashboard():
+    return render_template('dashboard.html', name='David')
 
 @app.route('/api', methods=['POST'])
-def call_api():
-    return jsonify({'message': 'Success!'})
+def publish_api():
+    schema = {
+        "type" : "object",
+        "properties" : {
+            "temperature" : {"type" : "number"},
+            "humidity" : {"type" : "number"},
+            "rain" : {"type" : "number"}
+        }
+    }
+
+    try:
+        params = json.loads(request.data)
+
+        validate(params, schema)
+        weather = Weather(params['temperature'], params['humidity'], params['rain'])
+        weather.store()
+
+        rain_msg = {
+            0: 'não está chovendo',
+            1: 'está caindo uma chuva fraca',
+            2: 'chove muito'
+        }[params['rain']]
+
+        tweet = 'No momento fazem %.1fº, a humidade relativa do ar é de %d%% e %s' % (params['temperature'], params['humidity'] * 100, rain_msg)
+        twitter = TwitterApi()
+        twitter.publish(tweet)
+
+        return jsonify({'message': 'sucesso'})
+    except Exception as e:
+        log = open('error.log', 'a')
+        log.write('%s\n' % str(e))
+        log.close()
+
+        return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
     app.debug = True
