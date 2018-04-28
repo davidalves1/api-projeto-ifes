@@ -16,42 +16,52 @@ app = Flask(__name__)
 def dashboard():
     return render_template('dashboard.html', name='David')
 
-@app.route('/api', methods=['POST'])
+@app.route('/api')
 def publish_api():
     schema = {
         "type" : "object",
         "properties" : {
-            "temperature" : {"type" : "number"},
-            "humidity" : {"type" : "number"},
-            "rain" : {"type" : "number"}
+            "temperature" : {"type" : "string"},
+            "humidity" : {"type" : "string"},
+            "rain" : {"type" : "string"}
         }
     }
 
     try:
-        params = json.loads(request.data)
+        params = {
+            'temperature': request.args.get('temperature'),
+            'humidity': request.args.get('humidity'),
+            'rain': request.args.get('rain')
+        }
+
+        print(params)
 
         validate(params, schema)
 
-        weather = Weather(params['temperature'], params['humidity'], params['rain'])
-        weather.store()
+        temperature = params['temperature']
+        humidity = params['humidity']
+        rain = params['rain']
 
-        ts = ThingSpeak(params['temperature'], params['humidity'], params['rain'])
+        # weather = Weather(temperature, humidity, rain)
+        # weather.store()
+
+        ts = ThingSpeak(temperature, humidity, rain)
         ts.send()
 
         rain_msg = {
             0: 'não está chovendo',
             1: 'está caindo uma chuva fraca',
             2: 'chove muito'
-        }[params['rain']]
+        }[rain]
 
-        import random
-        rand = random.randint(10,99)
+        # import random
+        # rand = random.randint(10,99)
 
-        tweet = 'No momento fazem %.1fº, a humidade relativa do ar é de %d%% e %s' % (params['temperature'] + (rand / 100), params['humidity'], rain_msg)
+        tweet = 'No momento fazem %.1fº, a humidade relativa do ar é de %d%% e %s' % (temperature, humidity, rain_msg)
         twitter = TwitterApi()
         twitter.publish(tweet)
 
-        return jsonify({'message': 'sucesso'})
+        return jsonify({'message': 'success'})
     except Exception as e:
         log = open('error.log', 'a')
         log.write('%s\n' % str(e))
@@ -60,5 +70,5 @@ def publish_api():
         return jsonify({"error": str(e)})
 
 if __name__ == '__main__':
-    app.debug = True
+    # app.debug = True
     app.run()
